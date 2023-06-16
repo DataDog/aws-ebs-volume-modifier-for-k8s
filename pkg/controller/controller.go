@@ -364,7 +364,8 @@ func (c *modifyController) needsProcessing(old *v1.PersistentVolumeClaim, new *v
 			return true
 		}
 	}
-	return false
+	// If the annotation was set at creation we might have skipped the PVC because it was not bound yet
+	return len(annotations) > 0 && old.Status.Phase != new.Status.Phase && new.Status.Phase == v1.ClaimBound
 }
 
 func getObjectKeys(obj interface{}) (string, error) {
