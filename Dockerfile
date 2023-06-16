@@ -1,3 +1,5 @@
+ARG BASE_IMAGE
+
 FROM --platform=$BUILDPLATFORM golang:1.20 AS builder
 WORKDIR /go/src/github.com/awslabs/volume-modifier-for-k8s
 COPY go.* .
@@ -9,6 +11,6 @@ ARG TARGETARCH
 ARG VERSION
 RUN OS=$TARGETOS ARCH=$TARGETARCH make $TARGETOS/$TARGETARCH
 
-FROM public.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base:latest.2 AS linux-amazon
+FROM $BASE_IMAGE
 COPY --from=builder /go/src/github.com/awslabs/volume-modifier-for-k8s/bin/volume-modifier-for-k8s /bin/volume-modifier-for-k8s
 ENTRYPOINT ["/bin/volume-modifier-for-k8s"]
