@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	"net/http/pprof"
+
 	csi "github.com/awslabs/volume-modifier-for-k8s/pkg/client"
 	"github.com/awslabs/volume-modifier-for-k8s/pkg/controller"
 	"github.com/awslabs/volume-modifier-for-k8s/pkg/modifier"
@@ -112,8 +114,13 @@ func main() {
 	}
 
 	if addr != "" {
-		metricsManager.RegisterToServer(mux, *metricsPath)
 		metricsManager.SetDriverName(driverName)
+		metricsManager.RegisterToServer(mux, *metricsPath)
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 		go func() {
 			klog.Infof("ServeMux listening at %q", addr)
 			err := http.ListenAndServe(addr, mux)
