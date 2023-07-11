@@ -10,6 +10,8 @@ import (
 	"github.com/kubernetes-csi/csi-lib-utils/rpc"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
@@ -35,11 +37,23 @@ func New(addr string, timeout time.Duration, metricsmanager metrics.CSIMetricsMa
 		return nil, fmt.Errorf("failed to create the OTLP exporter: %w", err)
 	}
 
-	// Create a trace provider with the exporter and a sampling strategy.
-	traceProvider := trace.NewTracerProvider(trace.WithBatcher(exporter), trace.WithSampler(trace.AlwaysSample()))
+	resources, err := resource.New(ctx,
+		resource.WithFromEnv(), // pull attributes from OTEL_RESOURCE_ATTRIBUTES and OTEL_SERVICE_NAME environment variables
+		resource.WithProcess(),
+		resource.WithOS(),
+		resource.WithContainer(),
+		resource.WithHost(),
+	)
+	if err != nil {
+		klog.ErrorS(err, "Failed to create the OTLP resource, spans will lack some metadata")
+	}
 
-	// Register the trace provider as the global tracer provider.
+	// Create a trace provider with the exporter and a sampling strategy.
+	traceProvider := trace.NewTracerProvider(trace.WithBatcher(exporter), trace.WithResource(resources), trace.WithSampler(trace.AlwaysSample()))
+
+	// Register the trace provider and propagator as global.
 	otel.SetTracerProvider(traceProvider)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
 
 	// Connect to the CSI driver.
 	conn, err := connection.Connect(addr, metricsmanager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
