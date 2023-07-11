@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kubernetes-csi/csi-lib-utils/connection"
+	"github.com/awslabs/volume-modifier-for-k8s/pkg/csi-lib-utils/connection"
 	"github.com/kubernetes-csi/csi-lib-utils/metrics"
 	"github.com/kubernetes-csi/csi-lib-utils/rpc"
 	"go.opentelemetry.io/otel"
@@ -27,8 +27,6 @@ type Client interface {
 	CloseConnection()
 }
 
-var tracer = otel.Tracer("aws-ebs-volume-modifier-for-k8s")
-
 func New(addr string, timeout time.Duration, metricsmanager metrics.CSIMetricsManager) (Client, error) {
 	// Create an OTLP exporter to the OpenTelemetry Collector.
 	ctx := context.Background()
@@ -38,7 +36,7 @@ func New(addr string, timeout time.Duration, metricsmanager metrics.CSIMetricsMa
 	}
 
 	// Create a trace provider with the exporter and a sampling strategy.
-	traceProvider := trace.NewTracerProvider(trace.WithBatcher(exporter))
+	traceProvider := trace.NewTracerProvider(trace.WithBatcher(exporter), trace.WithSampler(trace.AlwaysSample()))
 
 	// Register the trace provider as the global tracer provider.
 	otel.SetTracerProvider(traceProvider)
@@ -64,16 +62,10 @@ type client struct {
 }
 
 func (c *client) GetDriverName(ctx context.Context) (string, error) {
-	ctx, span := tracer.Start(ctx, "GetDriverName")
-	defer span.End()
-
 	return rpc.GetDriverName(ctx, c.conn)
 }
 
 func (c *client) SupportsVolumeModification(ctx context.Context) error {
-	ctx, span := tracer.Start(ctx, "SupportsVolumeModification")
-	defer span.End()
-
 	cc := modifyrpc.NewModifyClient(c.conn)
 	req := &modifyrpc.GetCSIDriverModificationCapabilityRequest{}
 	_, err := cc.GetCSIDriverModificationCapability(ctx, req)
@@ -81,9 +73,6 @@ func (c *client) SupportsVolumeModification(ctx context.Context) error {
 }
 
 func (c *client) Modify(ctx context.Context, volumeID string, params, reqContext map[string]string) error {
-	ctx, span := tracer.Start(ctx, "Modify")
-	defer span.End()
-
 	cc := modifyrpc.NewModifyClient(c.conn)
 	req := &modifyrpc.ModifyVolumePropertiesRequest{
 		Name:       volumeID,
