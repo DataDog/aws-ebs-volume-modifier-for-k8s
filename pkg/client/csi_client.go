@@ -5,9 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kubernetes-csi/csi-lib-utils/connection"
+	"github.com/awslabs/volume-modifier-for-k8s/pkg/csi-lib-utils/connection"
 	"github.com/kubernetes-csi/csi-lib-utils/metrics"
 	"github.com/kubernetes-csi/csi-lib-utils/rpc"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
@@ -25,7 +30,33 @@ type Client interface {
 }
 
 func New(addr string, timeout time.Duration, metricsmanager metrics.CSIMetricsManager) (Client, error) {
-	conn, err := connection.Connect(addr, metricsmanager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
+	// Create an OTLP exporter to the OpenTelemetry Collector.
+	ctx := context.Background()
+	exporter, err := otlptracegrpc.New(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create the OTLP exporter: %w", err)
+	}
+
+	resources, err := resource.New(ctx,
+		resource.WithFromEnv(), // pull attributes from OTEL_RESOURCE_ATTRIBUTES and OTEL_SERVICE_NAME environment variables
+		resource.WithProcess(),
+		resource.WithOS(),
+		resource.WithContainer(),
+		resource.WithHost(),
+	)
+	if err != nil {
+		klog.ErrorS(err, "Failed to create the OTLP resource, spans will lack some metadata")
+	}
+
+	// Create a trace provider with the exporter and a sampling strategy.
+	traceProvider := trace.NewTracerProvider(trace.WithBatcher(exporter), trace.WithResource(resources), trace.WithSampler(trace.AlwaysSample()))
+
+	// Register the trace provider and propagator as global.
+	otel.SetTracerProvider(traceProvider)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	// Connect to the CSI driver.
+	conn, err := connection.ConnectWithOtelGrpcInterceptor(addr, metricsmanager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to CSI driver: %w", err)
 	}
