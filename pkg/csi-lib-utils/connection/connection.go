@@ -74,6 +74,10 @@ func Connect(address string, metricsManager metrics.CSIMetricsManager, options .
 	return connect(address, metricsManager, []grpc.DialOption{}, options)
 }
 
+func ConnectWithOtelGrpcInterceptor(address string, metricsManager metrics.CSIMetricsManager, options ...Option) (*grpc.ClientConn, error) {
+	return connect(address, metricsManager, []grpc.DialOption{grpc.WithTimeout(time.Second * 30), grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor())}, options)
+}
+
 // Option is the type of all optional parameters for Connect.
 type Option func(o *options)
 
@@ -122,7 +126,6 @@ func connect(
 		grpc.WithChainUnaryInterceptor(
 			LogGRPC, // Log all messages.
 			ExtendedCSIMetricsManager{metricsManager}.RecordMetricsClientInterceptor, // Record metrics for each gRPC call.
-			otelgrpc.UnaryClientInterceptor(),
 		),
 	)
 	unixPrefix := "unix://"

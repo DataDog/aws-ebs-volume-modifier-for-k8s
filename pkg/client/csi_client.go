@@ -56,7 +56,7 @@ func New(addr string, timeout time.Duration, metricsmanager metrics.CSIMetricsMa
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
 	// Connect to the CSI driver.
-	conn, err := connection.Connect(addr, metricsmanager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
+	conn, err := connection.ConnectWithOtelGrpcInterceptor(addr, metricsmanager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to CSI driver: %w", err)
 	}
