@@ -276,6 +276,19 @@ func (c *modifyController) modifyPVC(pv *v1.PersistentVolume, pvc *v1.Persistent
 		}
 	}
 
+	if _, ok := params["volumeType"]; ok {
+		_, iops := params["iops"]
+		_, throughput := params["throughput"]
+		if iops || throughput {
+			// if iops or throughput annotations are present, do not return an error
+			// as it would break existing sts already using those annotations
+			klog.InfoS("removing volumeType annotation as iops or throughput is set", "pvc", util.PVCKey(pvc))
+			delete(params, "volumeType")
+		} else {
+			return fmt.Errorf("volumeType modification through annotation is not supported. Please remove the `%s/volumeType` annotation or reach out to Compute", c.name)
+		}
+	}
+
 	reqContext := make(map[string]string)
 
 	c.eventRecorder.Event(pvc, v1.EventTypeNormal, VolumeModificationStarted, fmt.Sprintf("External modifier is modifying volume %s", pv.Name))
