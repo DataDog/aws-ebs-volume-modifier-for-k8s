@@ -50,6 +50,9 @@ var (
 	kubeAPIQPS   = flag.Float64("kube-api-qps", 5, "QPS to use while communicating with the kubernetes apiserver. Defaults to 5.0.")
 	kubeAPIBurst = flag.Int("kube-api-burst", 10, "Burst to use while communicating with the kubernetes apiserver. Defaults to 10.")
 
+	// Defunct flag, keeping it for backwards compatibility.
+	_ = flag.Bool("volume-type-modification", false, "Enable volume type modification through annotation `volumeType`.")
+
 	// Passed through ldflags.
 	version = "<unknown>"
 )
