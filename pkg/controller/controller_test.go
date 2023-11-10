@@ -40,7 +40,7 @@ func TestControllerRun(t *testing.T) {
 		pvcModification                        pvcModifier
 	}{
 		{
-			name:       "volume modification succeeds after updating annotation",
+			name:       "volume modification succeeds after updating annotation (even with volumeType annotation)",
 			driverName: "ebs.csi.aws.com",
 			pvc:        newFakePVC(),
 			pv:         newFakePV("testPVC", namespace, "test"),
@@ -57,10 +57,22 @@ func TestControllerRun(t *testing.T) {
 			pvc:        newFakePVC(),
 			pv:         newFakePV("testPVC", namespace, "test"),
 			additionalPVCAnnotations: map[string]string{
-				"ebs.csi.aws.com/volumeType": "io2",
-				"ebs.csi.aws.com/iops":       "5000",
+				// "ebs.csi.aws.com/volumeType": "io2", // removed from original test
+				"ebs.csi.aws.com/iops": "5000",
 			},
 			expectedModifyVolumeCallCount: 1,
+			clientReturnsError:            true,
+			expectSuccessfulModification:  false,
+		},
+		{
+			name:       "volume modification fails if trying to modify the volume type only",
+			driverName: "ebs.csi.aws.com",
+			pvc:        newFakePVC(),
+			pv:         newFakePV("testPVC", namespace, "test"),
+			additionalPVCAnnotations: map[string]string{
+				"ebs.csi.aws.com/volumeType": "io2",
+			},
+			expectedModifyVolumeCallCount: 0,
 			clientReturnsError:            true,
 			expectSuccessfulModification:  false,
 		},
