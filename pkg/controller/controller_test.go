@@ -38,6 +38,7 @@ func TestControllerRun(t *testing.T) {
 		updatedCapacity                        string
 		expectSuccessfulModification           bool
 		pvcModification                        pvcModifier
+		enableVolumeTypeModification           bool
 	}{
 		{
 			name:       "volume modification succeeds after updating annotation (even with volumeType annotation)",
@@ -75,6 +76,19 @@ func TestControllerRun(t *testing.T) {
 			expectedModifyVolumeCallCount: 0,
 			clientReturnsError:            true,
 			expectSuccessfulModification:  false,
+		},
+		{
+			name:       "volume modification succedds if trying to modify the volume type with flag enabled",
+			driverName: "ebs.csi.aws.com",
+			pvc:        newFakePVC(),
+			pv:         newFakePV("testPVC", namespace, "test"),
+			additionalPVCAnnotations: map[string]string{
+				"ebs.csi.aws.com/volumeType": "io2",
+			},
+			expectedModifyVolumeCallCount: 1,
+			clientReturnsError:            true,
+			expectSuccessfulModification:  true,
+			enableVolumeTypeModification:  true,
 		},
 		{
 			name:                          "no volume modification after PVC resync",
@@ -147,6 +161,7 @@ func TestControllerRun(t *testing.T) {
 				factory,
 				workqueue.DefaultControllerRateLimiter(),
 				false,
+				tc.enableVolumeTypeModification,
 			)
 
 			stopCh := make(chan struct{})
