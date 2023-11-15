@@ -35,6 +35,7 @@ func NewModifyController(
 	informerFactory informers.SharedInformerFactory,
 	pvcRateLimiter workqueue.RateLimiter,
 	retryModificationFailures bool,
+	enableVolumeTypeModification bool,
 ) ModifyController {
 	pvInformer := informerFactory.Core().V1().PersistentVolumes()
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
@@ -57,6 +58,7 @@ func NewModifyController(
 		claims:                 pvcInformer.Informer().GetStore(),
 		eventRecorder:          eventRecorder,
 		modificationInProgress: make(map[string]struct{}),
+		volumeTypeModification: enableVolumeTypeModification,
 	}
 
 	pvcInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -84,7 +86,8 @@ type modifyController struct {
 	volumes cache.Store
 	claims  cache.Store
 
-	retryFailures bool
+	retryFailures          bool
+	volumeTypeModification bool
 }
 
 func (c *modifyController) Run(workers int, ctx context.Context) {
@@ -268,7 +271,7 @@ func (c *modifyController) modifyPVC(pv *v1.PersistentVolume, pvc *v1.Persistent
 		}
 	}
 
-	if _, ok := params["volumeType"]; ok {
+	if _, ok := params["volumeType"]; !c.volumeTypeModification && ok {
 		_, iops := params["iops"]
 		_, throughput := params["throughput"]
 		if iops || throughput {
