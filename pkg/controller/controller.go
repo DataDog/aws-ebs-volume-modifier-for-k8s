@@ -271,6 +271,7 @@ func (c *modifyController) modifyPVC(pv *v1.PersistentVolume, pvc *v1.Persistent
 		}
 	}
 
+	// Begin Datadog patch
 	if _, ok := params["volumeType"]; !c.volumeTypeModification && ok {
 		_, iops := params["iops"]
 		_, throughput := params["throughput"]
@@ -284,6 +285,7 @@ func (c *modifyController) modifyPVC(pv *v1.PersistentVolume, pvc *v1.Persistent
 			return fmt.Errorf("volumeType modification through annotation is not supported. Please remove the `%s/volumeType` annotation or reach out to Compute", c.name)
 		}
 	}
+	// End Datadog patch
 
 	reqContext := make(map[string]string)
 
