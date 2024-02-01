@@ -279,6 +279,12 @@ func verifyAnnotationsOnPV(updatedAnnotations, expectedAnnotations map[string]st
 			return fmt.Errorf("unexpected annotation on PV: %s (value : %s)", k, v)
 		}
 	}
+	// Begin Datadog patch
+	// We can't check the annotation in the loop before because it is not present on the PVC
+	if _, ok := updatedAnnotations["ebs.csi.aws.com/diskLastModificationTime"]; !ok {
+		return fmt.Errorf("missing diskLastModificationTime annotation on PV (got : %s)", updatedAnnotations)
+	}
+	// End Datadog patch
 	return nil
 }
 
