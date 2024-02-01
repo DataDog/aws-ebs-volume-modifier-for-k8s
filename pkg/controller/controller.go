@@ -286,6 +286,7 @@ func (c *modifyController) modifyPVC(pv *v1.PersistentVolume, pvc *v1.Persistent
 			// if iops or throughput annotations are present, do not return an error
 			// as it would break existing sts already using those annotations
 			klog.InfoS("removing volumeType annotation as iops or throughput is set", "pvc", util.PVCKey(pvc))
+			c.eventRecorder.Eventf(pvc, v1.EventTypeWarning, VolumeModificationStarted, "removing volumeType modification annotation as it is not supported anymore. Please reach out to Compute if you have questions.")
 			delete(params, "volumeType")
 		} else {
 			return fmt.Errorf("volumeType modification through annotation is not supported. Please remove the `%s/volumeType` annotation or reach out to Compute", c.name)
