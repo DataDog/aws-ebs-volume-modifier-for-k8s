@@ -86,7 +86,6 @@ func TestControllerRun(t *testing.T) {
 				"ebs.csi.aws.com/volumeType": "io2",
 			},
 			expectedModifyVolumeCallCount: 1,
-			clientReturnsError:            true,
 			expectSuccessfulModification:  true,
 			enableVolumeTypeModification:  true,
 		},
@@ -192,7 +191,7 @@ func TestControllerRun(t *testing.T) {
 			}
 
 			if tc.expectSuccessfulModification {
-				err = verifyAnnotationsOnPV(updatedPV.Annotations, tc.additionalPVCAnnotations)
+				err = verifyAnnotationsOnPV(updatedPV.Annotations, tc.additionalPVCAnnotations, tc.enableVolumeTypeModification)
 			} else {
 				err = verifyNoAnnotationsOnPV(updatedPV.Annotations, driverName)
 			}
@@ -212,10 +211,10 @@ func verifyNoAnnotationsOnPV(ann map[string]string, driverName string) error {
 	return nil
 }
 
-func verifyAnnotationsOnPV(updatedAnnotations, expectedAnnotations map[string]string) error {
+func verifyAnnotationsOnPV(updatedAnnotations, expectedAnnotations map[string]string, enableVolumeTypeModification bool) error {
 	for k, v := range expectedAnnotations {
-		if updatedAnnotations[k] != v && k != "ebs.csi.aws.com/volumeType" {
-			return fmt.Errorf("unexpected annotation on PV: %s (value : %s)", k, v)
+		if updatedAnnotations[k] != v && (enableVolumeTypeModification || k != "ebs.csi.aws.com/volumeType") {
+			return fmt.Errorf("missing annotation on PV: %s (value : %s)", k, v)
 		}
 	}
 	return nil
