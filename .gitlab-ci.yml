@@ -9,10 +9,3 @@ test:
 
 build-docker-image:
   extends: .build-docker-image
-
-run-campaign-aws:
-  variables:
-    CHART_NAME: k8s-platform-aws-ebs-csi-driver
-    COMPONENT: modifier
-    SLACK_CHANNEL: compute-storage-ops
-  extends: .run-campaign
