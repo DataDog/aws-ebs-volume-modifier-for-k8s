@@ -58,6 +58,7 @@ func NewModifyController(
 		claims:                 pvcInformer.Informer().GetStore(),
 		eventRecorder:          eventRecorder,
 		modificationInProgress: make(map[string]struct{}),
+		retryFailures:          retryModificationFailures,
 		volumeTypeModification: enableVolumeTypeModification,
 	}
 
