@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
 	"github.com/kubernetes-csi/csi-lib-utils/metrics"
 	"github.com/kubernetes-csi/csi-lib-utils/rpc"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
-
-	modifyrpc "github.com/awslabs/volume-modifier-for-k8s/pkg/rpc"
 )
 
 type Client interface {
@@ -37,13 +36,17 @@ func New(addr string, timeout time.Duration, metricsmanager metrics.CSIMetricsMa
 		return nil, fmt.Errorf("failed probing CSI driver: %w", err)
 	}
 
+	csiClient := csi.NewControllerClient(conn)
+
 	return &client{
-		conn: conn,
+		conn:      conn,
+		csiClient: csiClient,
 	}, nil
 }
 
 type client struct {
-	conn *grpc.ClientConn
+	conn      *grpc.ClientConn
+	csiClient csi.ControllerClient
 }
 
 func (c *client) GetDriverName(ctx context.Context) (string, error) {
@@ -51,20 +54,22 @@ func (c *client) GetDriverName(ctx context.Context) (string, error) {
 }
 
 func (c *client) SupportsVolumeModification(ctx context.Context) error {
-	cc := modifyrpc.NewModifyClient(c.conn)
-	req := &modifyrpc.GetCSIDriverModificationCapabilityRequest{}
-	_, err := cc.GetCSIDriverModificationCapability(ctx, req)
-	return err
+	controllerCapabilities, err := rpc.GetControllerCapabilities(ctx, c.conn)
+	if err != nil {
+		return err
+	}
+	if !controllerCapabilities[csi.ControllerServiceCapability_RPC_MODIFY_VOLUME] {
+		return fmt.Errorf("CSI driver does not support volume modification")
+	}
+	return nil
 }
 
 func (c *client) Modify(ctx context.Context, volumeID string, params, reqContext map[string]string) error {
-	cc := modifyrpc.NewModifyClient(c.conn)
-	req := &modifyrpc.ModifyVolumePropertiesRequest{
-		Name:       volumeID,
-		Parameters: params,
-		Context:    reqContext,
+	req := &csi.ControllerModifyVolumeRequest{
+		VolumeId:          volumeID,
+		MutableParameters: params,
 	}
-	_, err := cc.ModifyVolumeProperties(ctx, req)
+	_, err := c.csiClient.ControllerModifyVolume(ctx, req)
 	if err == nil {
 		klog.V(4).InfoS("Volume modification completed", "volumeID", volumeID)
 	}
