@@ -30,7 +30,7 @@ check: check-proto
 .PHONY: linux/$(ARCH) bin/volume-modifier-for-k8s
 linux/$(ARCH): bin/volume-modifier-for-k8s
 bin/volume-modifier-for-k8s: | bin
-	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -mod=mod -buildvcs=false -ldflags ${LDFLAGS} -o bin/volume-modifier-for-k8s ./cmd
+	CGO_ENABLED=1 GOEXPERIMENT=boringcrypto GOOS=$(OS) GOARCH=$(ARCH) go build -mod=mod -ldflags ${LDFLAGS} -tags fips -o bin/volume-modifier-for-k8s ./cmd && go tool nm $@ | grep 'sig\.FIPSOnly'
 
 .PHONY: check-proto
 check-proto:
