@@ -205,8 +205,7 @@ func (c *modifyController) syncPVC(key string) error {
 	}
 
 	if !exists {
-		klog.Warningf("PV %q bound to PVC %s not found", pvc.Spec.VolumeName, util.PVCKey(pvc))
-		return nil
+		return fmt.Errorf("PV %q bound to PVC %s not found", pvc.Spec.VolumeName, util.PVCKey(pvc))
 	}
 
 	pv, ok := volumeObj.(*v1.PersistentVolume)
