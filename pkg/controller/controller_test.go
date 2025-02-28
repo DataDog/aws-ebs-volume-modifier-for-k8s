@@ -320,6 +320,7 @@ func TestControllerRun(t *testing.T) {
 		updatedCapacity               string
 		expectSuccessfulModification  bool
 		pvcModification               pvcModifier
+		retryOnError                  bool
 	}{
 		{
 			name:       "volume modification succeeds after updating annotation",
@@ -376,6 +377,12 @@ func TestControllerRun(t *testing.T) {
 			expectedModifyVolumeCallCount: 1,
 			expectSuccessfulModification:  true,
 		},
+		{
+			name:         "retry if pv not in cache yet",
+			driverName:   "ebs.csi.aws.com",
+			pvc:          newFakePVC(),
+			retryOnError: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -409,14 +416,16 @@ func TestControllerRun(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			rateLimiter := workqueue.DefaultControllerRateLimiter()
+
 			controller := NewModifyController(
 				tc.driverName,
 				modifier,
 				k8sClient,
 				0,
 				factory,
-				workqueue.DefaultControllerRateLimiter(),
-				false,
+				rateLimiter,
+				tc.retryOnError,
 			)
 
 			stopCh := make(chan struct{})
@@ -449,6 +458,18 @@ func TestControllerRun(t *testing.T) {
 
 			if client.GetModifyCallCount() != tc.expectedModifyVolumeCallCount {
 				t.Fatalf("unexpected modify volume call count: expected %d, got %d", tc.expectedModifyVolumeCallCount, client.GetModifyCallCount())
+			}
+
+			pvcKey, err := getObjectKeys(tc.pvc)
+			if err != nil {
+				t.Fatalf("failed to get pvc key, err: %v", err)
+			}
+			if tc.retryOnError && rateLimiter.NumRequeues(pvcKey) == 0 {
+				t.Fatalf("expected requeue on error, but got none for key %s", pvcKey)
+			}
+
+			if tc.pv == nil {
+				return
 			}
 
 			if tc.expectSuccessfulModification {

@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -204,8 +205,7 @@ func (c *modifyController) syncPVC(key string) error {
 	}
 
 	if !exists {
-		klog.Warningf("PV %q bound to PVC %s not found", pvc.Spec.VolumeName, util.PVCKey(pvc))
-		return nil
+		return fmt.Errorf("PV %q bound to PVC %s not found", pvc.Spec.VolumeName, util.PVCKey(pvc))
 	}
 
 	pv, ok := volumeObj.(*v1.PersistentVolume)
@@ -291,16 +291,22 @@ func (c *modifyController) modifyPVC(pv *v1.PersistentVolume, pvc *v1.Persistent
 	c.eventRecorder.Event(pvc, v1.EventTypeNormal, VolumeModificationStarted, fmt.Sprintf("External modifier is modifying volume %s", pv.Name))
 
 	err := c.modifier.Modify(pv, params, reqContext)
-	// Begin Datadog patch
-	modificationTime := time.Now().UTC().Format(time.RFC3339)
-	params["diskLastModificationTime"] = modificationTime
-	// End Datadog patch
 	if err != nil {
 		c.eventRecorder.Event(pvc, v1.EventTypeWarning, VolumeModificationFailed, err.Error())
 		return fmt.Errorf("modification of volume %q failed by modifier %q: %w", pvc.Name, c.name, err)
 	} else {
 		c.eventRecorder.Eventf(pvc, v1.EventTypeNormal, VolumeModificationSuccessful, "External modifier has successfully modified volume %s", pv.Name)
 	}
+
+	// Begin Datadog patch
+	// Record the modification time as a PV annotation. Build a fresh map
+	// rather than mutating params, which has already been handed off to the
+	// modifier.
+	completionParams := make(map[string]string, len(params)+1)
+	maps.Copy(completionParams, params)
+	completionParams["diskLastModificationTime"] = time.Now().UTC().Format(time.RFC3339)
+	params = completionParams
+	// End Datadog patch
 
 	return c.markPVCModificationComplete(pv, params)
 }
