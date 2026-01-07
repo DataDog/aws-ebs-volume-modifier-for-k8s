@@ -1,6 +1,6 @@
 module github.com/awslabs/volume-modifier-for-k8s
 
-go 1.19
+go 1.25.5
 
 require (
 	github.com/golang/protobuf v1.5.3
