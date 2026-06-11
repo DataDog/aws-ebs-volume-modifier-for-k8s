@@ -1,0 +1,18 @@
+ARG BASE_IMAGE
+ARG BUILDER_IMAGE
+
+FROM $BUILDER_IMAGE AS builder
+WORKDIR /go/src/github.com/awslabs/volume-modifier-for-k8s
+COPY go.* .
+ARG GOPROXY=direct
+ENV GOTOOLCHAIN auto
+RUN go mod download
+COPY . .
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION
+RUN mkdir bin && OS=$TARGETOS ARCH=$TARGETARCH make $TARGETOS/$TARGETARCH
+
+FROM $BASE_IMAGE
+COPY --from=builder /go/src/github.com/awslabs/volume-modifier-for-k8s/bin/volume-modifier-for-k8s /bin/volume-modifier-for-k8s
+ENTRYPOINT ["/bin/volume-modifier-for-k8s"]
